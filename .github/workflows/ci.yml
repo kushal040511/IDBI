@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Byte-compile all Python sources
+        run: python -m compileall -q main.py *.py
+
+      - name: Validate requirements.txt is parseable
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          for line in pathlib.Path("requirements.txt").read_text().splitlines():
+              line = line.split("#", 1)[0].strip()
+              if line:
+                  assert re.match(r"^[A-Za-z0-9_.\-\[\]]+", line), f"bad requirement: {line!r}"
+          print("requirements.txt OK")
+          PY
+
+      - name: Check model artifacts are present
+        run: |
+          for f in models/real/pipeline.joblib models/real/shap_explainer.joblib \
+                   models/real/feature_names.json models/real/performance_report.json; do
+            test -f "$f" && echo "  ✓ $f" || { echo "  ✗ missing $f"; exit 1; }
+          done

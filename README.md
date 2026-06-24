@@ -1,4 +1,42 @@
-# IDBI MSME Risk Intelligence Engine
+# IDBI Credit Risk Intelligence Engine
+
+An explainable, forward-looking credit-default prediction engine and early-warning dashboard (IDBI Track 04 — MSME Credit / Predictive AI / Risk Management).
+
+> **Current model:** trained strictly on the real **credit_risk_dataset.csv** (32,581 borrowers) — held-out **ROC-AUC 0.954**, Accuracy 92.8%, Precision 86.4%, F1 83.0% (Optuna-tuned, calibrated, leak-free CV). An MSME variant (structured + NLP officer-notes) is preserved in `main_msme_backup.py`.
+
+## ⚡ Quickstart
+```bash
+# 1. Environment + dependencies
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+brew install libomp                 # macOS only — XGBoost OpenMP runtime
+
+# 2. (Optional) enable the LLM Copilot — else it uses offline templates
+cp .env.example .env                # add GEMINI_API_KEY or ANTHROPIC_API_KEY
+
+# 3. Run
+uvicorn main:app --reload --port 8000
+# open http://127.0.0.1:8000/
+```
+The trained model ships in `models/real/`, so the app runs immediately — no training needed.
+To **retrain**, place `credit_risk_dataset.csv` in `data/` and run `python train_real_credit.py`
+(input datasets are gitignored and not committed).
+
+## 🧩 API Endpoints
+| Purpose | Endpoint |
+|---|---|
+| Portfolio summary / borrowers | `GET /portfolio`, `GET /borrowers` |
+| Borrower detail + PD trajectory + Expected Loss + actions | `GET /borrowers/{id}` |
+| SHAP explainability | `GET /borrowers/{id}/explain` |
+| Model metrics | `GET /model-performance` |
+| Upload portfolio (credit_risk schema) / reset | `POST /upload`, `POST /reset` |
+| Simulate new loans | `POST /refresh` |
+| Agentic Risk Copilot (Gemini/Claude/templates) | `POST /copilot` |
+
+---
+
+> **Note:** the sections below describe the original MSME framing and remain accurate for the
+> `main_msme_backup.py` variant (GST/EMI/cashflow behavioural features + NLP officer notes).
 
 An advanced, forward-looking predictive AI engine and early-warning dashboard designed for the IDBI MSME Credit Risk portfolio (Track 04).
 
