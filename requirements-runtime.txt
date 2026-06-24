@@ -1,0 +1,14 @@
+# Minimal pinned runtime — just enough to load models/real/ and serve main.py.
+# (Excludes the heavy training/NLP/LLM extras in requirements.txt.)
+# Versions pinned to what the model was trained/serialized with, so joblib loads cleanly.
+numpy==2.4.6
+scipy==1.18.0
+scikit-learn==1.9.0
+xgboost==3.3.0
+shap==0.52.0
+pandas==3.0.3
+joblib==1.5.3
+fastapi==0.138.0
+uvicorn==0.49.0
+python-multipart==0.0.32
+python-dotenv==1.2.2

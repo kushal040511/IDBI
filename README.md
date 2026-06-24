@@ -1,5 +1,7 @@
 # IDBI Credit Risk Intelligence Engine
 
+[![CI](https://github.com/kushal040511/IDBI/actions/workflows/ci.yml/badge.svg)](https://github.com/kushal040511/IDBI/actions/workflows/ci.yml)
+
 An explainable, forward-looking credit-default prediction engine and early-warning dashboard (IDBI Track 04 — MSME Credit / Predictive AI / Risk Management).
 
 > **Current model:** trained strictly on the real **credit_risk_dataset.csv** (32,581 borrowers) — held-out **ROC-AUC 0.954**, Accuracy 92.8%, Precision 86.4%, F1 83.0% (Optuna-tuned, calibrated, leak-free CV). An MSME variant (structured + NLP officer-notes) is preserved in `main_msme_backup.py`.
