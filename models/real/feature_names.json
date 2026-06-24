@@ -1,0 +1,21 @@
+[
+  "num__person_age",
+  "num__person_income",
+  "num__person_emp_length",
+  "num__loan_amnt",
+  "num__loan_int_rate",
+  "num__loan_percent_income",
+  "num__cb_person_cred_hist_length",
+  "num__loan_grade_ord",
+  "num__default_flag",
+  "cat__person_home_ownership_MORTGAGE",
+  "cat__person_home_ownership_OTHER",
+  "cat__person_home_ownership_OWN",
+  "cat__person_home_ownership_RENT",
+  "cat__loan_intent_DEBTCONSOLIDATION",
+  "cat__loan_intent_EDUCATION",
+  "cat__loan_intent_HOMEIMPROVEMENT",
+  "cat__loan_intent_MEDICAL",
+  "cat__loan_intent_PERSONAL",
+  "cat__loan_intent_VENTURE"
+]

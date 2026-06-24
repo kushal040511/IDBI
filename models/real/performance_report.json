@@ -1,0 +1,116 @@
+{
+  "dataset": "credit_risk_dataset.csv (real, 32.5k borrowers)",
+  "n_train": 25927,
+  "n_test": 6482,
+  "default_rate": 0.2187,
+  "tuning": {
+    "method": "Optuna TPE",
+    "trials": 50,
+    "cv_folds": 5,
+    "best_cv_auc": 0.9492,
+    "best_params": {
+      "n_estimators": 750,
+      "max_depth": 6,
+      "learning_rate": 0.08133053799289963,
+      "subsample": 0.9390534793169014,
+      "colsample_bytree": 0.6372240831148525,
+      "min_child_weight": 11,
+      "gamma": 0.8286658430424825,
+      "reg_lambda": 0.003031399832219831,
+      "reg_alpha": 0.007999461080792983,
+      "scale_pos_weight": 2.6267963305515862
+    }
+  },
+  "tuned": {
+    "roc_auc": 0.9542,
+    "pr_auc": 0.9135,
+    "log_loss": 0.1955,
+    "log_loss_calibrated": 0.1904,
+    "brier": 0.0563,
+    "brier_calibrated": 0.0503,
+    "at_0.50": {
+      "threshold": 0.5,
+      "accuracy": 0.9284,
+      "precision": 0.8636,
+      "recall": 0.799,
+      "f1": 0.83,
+      "confusion_matrix": {
+        "tn": 4885,
+        "fp": 179,
+        "fn": 285,
+        "tp": 1133
+      }
+    },
+    "at_best_f1": {
+      "threshold": 0.63,
+      "accuracy": 0.9375,
+      "precision": 0.9378,
+      "recall": 0.7652,
+      "f1": 0.8427,
+      "confusion_matrix": {
+        "tn": 4992,
+        "fp": 72,
+        "fn": 333,
+        "tp": 1085
+      }
+    },
+    "at_recall85": {
+      "threshold": 0.33,
+      "accuracy": 0.8952,
+      "precision": 0.7195,
+      "recall": 0.854,
+      "f1": 0.781,
+      "confusion_matrix": {
+        "tn": 4592,
+        "fp": 472,
+        "fn": 207,
+        "tp": 1211
+      }
+    }
+  },
+  "baseline_logreg": {
+    "roc_auc": 0.8647,
+    "accuracy": 0.7914,
+    "precision": 0.5153,
+    "recall": 0.7849,
+    "f1": 0.6221
+  },
+  "operating_thresholds": {
+    "best_f1": 0.63,
+    "recall85": 0.33
+  },
+  "raw_features": [
+    "person_age",
+    "person_income",
+    "person_emp_length",
+    "loan_amnt",
+    "loan_int_rate",
+    "loan_percent_income",
+    "cb_person_cred_hist_length",
+    "loan_grade_ord",
+    "default_flag",
+    "person_home_ownership",
+    "loan_intent"
+  ],
+  "model_features": [
+    "num__person_age",
+    "num__person_income",
+    "num__person_emp_length",
+    "num__loan_amnt",
+    "num__loan_int_rate",
+    "num__loan_percent_income",
+    "num__cb_person_cred_hist_length",
+    "num__loan_grade_ord",
+    "num__default_flag",
+    "cat__person_home_ownership_MORTGAGE",
+    "cat__person_home_ownership_OTHER",
+    "cat__person_home_ownership_OWN",
+    "cat__person_home_ownership_RENT",
+    "cat__loan_intent_DEBTCONSOLIDATION",
+    "cat__loan_intent_EDUCATION",
+    "cat__loan_intent_HOMEIMPROVEMENT",
+    "cat__loan_intent_MEDICAL",
+    "cat__loan_intent_PERSONAL",
+    "cat__loan_intent_VENTURE"
+  ]
+}

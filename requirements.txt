@@ -1,0 +1,27 @@
+# IDBI MSME Risk Intelligence — Python dependencies
+# Install with:  pip install -r requirements.txt
+# (XGBoost on macOS also needs the OpenMP runtime:  brew install libomp)
+
+# --- API / serving ---
+fastapi
+uvicorn
+python-multipart          # required for file-upload (Data Upload module)
+
+# --- ML core ---
+pandas
+numpy
+scikit-learn
+xgboost
+lightgbm                  # alternate gradient-boosting engine (train_ml_model.py)
+shap                      # explainability (SHAP TreeExplainer)
+joblib                    # model serialization
+
+# --- Unstructured / NLP feature extraction (officer notes) ---
+sentence-transformers     # pulls torch; used by train_ml_model.py NLP overlay
+
+# --- Agentic Risk Copilot (optional LLM engine) ---
+anthropic                 # used only when ANTHROPIC_API_KEY is set; falls back to local templates
+google-genai             # Gemini engine (alternative to Claude)
+
+# --- config ---
+python-dotenv             # loads ANTHROPIC_API_KEY from .env

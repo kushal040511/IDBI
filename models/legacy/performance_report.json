@@ -1,0 +1,107 @@
+{
+  "dataset": "Realistic synthetic MSME (noisy, non-separable) \u2014 data/msme_realistic.csv",
+  "n_train": 21000,
+  "n_test": 9000,
+  "default_rate": 0.1698,
+  "tuning": {
+    "method": "Optuna TPE",
+    "trials": 60,
+    "cv_folds": 3,
+    "best_cv_auc": 0.8943,
+    "best_params": {
+      "n_estimators": 550,
+      "max_depth": 7,
+      "learning_rate": 0.013322948010370901,
+      "subsample": 0.6741695144040087,
+      "colsample_bytree": 0.7517543105170598,
+      "min_child_weight": 4,
+      "gamma": 2.9579393773794904,
+      "reg_lambda": 6.874453094136593,
+      "reg_alpha": 0.003800180868504704,
+      "scale_pos_weight": 1.3530307961817907
+    }
+  },
+  "tuned": {
+    "roc_auc": 0.8836,
+    "pr_auc": 0.7452,
+    "log_loss": 0.268,
+    "log_loss_calibrated": 0.2775,
+    "brier": 0.0763,
+    "brier_calibrated": 0.0756,
+    "at_0.50": {
+      "threshold": 0.5,
+      "accuracy": 0.9009,
+      "precision": 0.7377,
+      "recall": 0.6459,
+      "f1": 0.6888,
+      "confusion_matrix": {
+        "tn": 7121,
+        "fp": 351,
+        "fn": 541,
+        "tp": 987
+      }
+    },
+    "at_best_f1": {
+      "threshold": 0.39,
+      "accuracy": 0.8951,
+      "precision": 0.6853,
+      "recall": 0.7068,
+      "f1": 0.6959,
+      "confusion_matrix": {
+        "tn": 6976,
+        "fp": 496,
+        "fn": 448,
+        "tp": 1080
+      }
+    },
+    "at_recall85": {
+      "threshold": 0.1,
+      "accuracy": 0.7811,
+      "precision": 0.4275,
+      "recall": 0.8527,
+      "f1": 0.5695,
+      "confusion_matrix": {
+        "tn": 5727,
+        "fp": 1745,
+        "fn": 225,
+        "tp": 1303
+      }
+    }
+  },
+  "legacy_on_same_test": {
+    "roc_auc": 0.8106,
+    "log_loss": 0.5627,
+    "at_0.50_accuracy": 0.7079,
+    "at_0.50_precision": 0.3408,
+    "at_0.50_recall": 0.7716,
+    "at_0.50_f1": 0.4728,
+    "confusion_matrix_0.50": {
+      "tn": 5192,
+      "fp": 2280,
+      "fn": 349,
+      "tp": 1179
+    }
+  },
+  "operating_thresholds": {
+    "best_f1": 0.39,
+    "recall85": 0.1
+  },
+  "features": [
+    "revolving_utilization",
+    "debt_ratio",
+    "late_30_59",
+    "late_60_89",
+    "late_90_days",
+    "open_credit_lines",
+    "real_estate_loans",
+    "num_dependents",
+    "income_stability",
+    "gst_compliance_score",
+    "emi_delay_count",
+    "cashflow_stress_ratio",
+    "working_capital_usage",
+    "revenue_trend_index",
+    "payment_history_score",
+    "supplier_payment_risk"
+  ]
+}
