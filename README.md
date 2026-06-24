@@ -4,7 +4,9 @@
 
 An explainable, forward-looking credit-default prediction engine and early-warning dashboard (IDBI Track 04 — MSME Credit / Predictive AI / Risk Management).
 
-> **Current model:** trained strictly on the real **credit_risk_dataset.csv** (32,581 borrowers) — held-out **ROC-AUC 0.954**, Accuracy 92.8%, Precision 86.4%, F1 83.0% (Optuna-tuned, calibrated, leak-free CV). An MSME variant (structured + NLP officer-notes) is preserved in `main_msme_backup.py`.
+> **Current model:** trained strictly on the real **credit_risk_dataset.csv** (32,581 borrowers) using **both structured and unstructured data** (credit features + NLP `note_stress_index` from officer notes) — held-out **ROC-AUC 0.969** (structured-only 0.955, +0.014 from unstructured), Accuracy 94%, Precision 91%, F1 86% at the best-F1 operating point (Optuna-tuned, calibrated, leak-free CV). Trainers: `train_real_credit.py` (structured) and `train_real_credit_nlp.py` (+unstructured). An MSME variant is preserved in `main_msme_backup.py`.
+
+**Blueprint coverage (live app):** Data Upload · Feature Engineering · Risk Prediction (PD) · Risk Score (0–100) · SHAP Explainability · Risk-Factor Breakdown · 12-month PD Timeline · Expected Loss (PD×EAD×LGD) · Action Ladder · Structured + Unstructured (officer-notes NLP) · Agentic Risk Copilot.
 
 ## ⚡ Quickstart
 ```bash

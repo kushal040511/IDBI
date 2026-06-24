@@ -8,6 +8,7 @@
   "num__cb_person_cred_hist_length",
   "num__loan_grade_ord",
   "num__default_flag",
+  "num__note_stress_index",
   "cat__person_home_ownership_MORTGAGE",
   "cat__person_home_ownership_OTHER",
   "cat__person_home_ownership_OWN",

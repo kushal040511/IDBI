@@ -23,6 +23,8 @@ try:
 except ImportError:
     pass
 
+import nlp_features  # unstructured-data (officer notes) → note_stress_index
+
 app = FastAPI(title="Credit Risk Intelligence API")
 app.mount("/dashboard", StaticFiles(directory="static", html=True), name="static")
 
@@ -35,11 +37,21 @@ SCHEMA = None          # raw input schema
 PERF = {}
 feature_df = None
 
-RAW_NUM = ['person_age', 'person_income', 'person_emp_length', 'loan_amnt',
-           'loan_int_rate', 'loan_percent_income', 'cb_person_cred_hist_length',
-           'loan_grade_ord', 'default_flag']
+RAW_STRUCT_NUM = ['person_age', 'person_income', 'person_emp_length', 'loan_amnt',
+                  'loan_int_rate', 'loan_percent_income', 'cb_person_cred_hist_length',
+                  'loan_grade_ord', 'default_flag']
+RAW_NLP_NUM = ['note_stress_index']               # unstructured-data feature
+RAW_NUM = RAW_STRUCT_NUM + RAW_NLP_NUM
 RAW_CAT = ['person_home_ownership', 'loan_intent']
 RAW_INPUT = RAW_NUM + RAW_CAT
+
+# Blueprint risk-factor groupings (for the borrower-detail breakdown)
+RISK_FACTOR_GROUPS = {
+    "Repayment & Bureau": ['default_flag', 'cb_person_cred_hist_length', 'loan_grade_ord'],
+    "Affordability / Cashflow": ['loan_percent_income', 'loan_int_rate', 'loan_amnt'],
+    "Borrower Profile": ['person_age', 'person_income', 'person_emp_length'],
+    "Unstructured (Officer Notes)": ['note_stress_index'],
+}
 GRADE_MAP = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5, 'F': 6, 'G': 7}
 GRADE_LETTER = {v: k for k, v in GRADE_MAP.items()}
 INTENTS = ['DEBTCONSOLIDATION', 'EDUCATION', 'HOMEIMPROVEMENT', 'MEDICAL', 'PERSONAL', 'VENTURE']
@@ -91,6 +103,7 @@ def narrate_feature(fname: str, value: float) -> str:
             return f"Loan purpose: {fname.split('loan_intent_')[-1].title()}." if value > 0.5 else ""
         return f"{base}: {'yes' if value > 0.5 else 'no'}."
     # numeric
+    if base == 'note_stress_index':    return f"Officer-notes stress index (NLP): {value:.2f}/1.0 — {'alarming language in notes' if value > 0.66 else 'some concern in notes' if value > 0.4 else 'notes read healthy'}."
     if base == 'person_age':           return f"Borrower age: {value:.0f} years."
     if base == 'person_income':        return f"Annual income: ${value:,.0f} — {'low' if value < 40000 else 'moderate' if value < 90000 else 'high'}."
     if base == 'person_emp_length':    return f"Employment length: {value:.0f} year(s) — {'short tenure' if value < 2 else 'stable'}."
@@ -102,7 +115,33 @@ def narrate_feature(fname: str, value: float) -> str:
     if base == 'default_flag':         return "Prior default on file — major red flag." if value > 0.5 else "No prior default on file."
     return f"{base}: {value:.2f}"
 
+_STRESSED_NOTES = [
+    "Borrower under severe repayment stress; multiple missed EMIs and rising overdues.",
+    "Income appears unstable, high loan-to-income; serious default risk flagged by RM.",
+    "Cashflow tightening, frequent overdrafts; recovery concerns noted this quarter.",
+]
+_NEUTRAL_NOTES = [
+    "Repayments broadly on schedule with minor irregularities this period.",
+    "Some pressure on disposable income but obligations being met.",
+]
+_HEALTHY_NOTES = [
+    "Strong repayment discipline and comfortable affordability; low risk borrower.",
+    "Stable income, healthy credit history, all dues paid on time.",
+]
+
+def _pick_note(rng, risk_proxy: float) -> str:
+    r = rng.random()
+    if risk_proxy >= 0.6:
+        pool = _STRESSED_NOTES if r < 0.7 else _NEUTRAL_NOTES
+    elif risk_proxy >= 0.33:
+        pool = _NEUTRAL_NOTES if r < 0.6 else (_STRESSED_NOTES if r < 0.8 else _HEALTHY_NOTES)
+    else:
+        pool = _HEALTHY_NOTES if r < 0.7 else _NEUTRAL_NOTES
+    return pool[rng.randint(len(pool))]
+
+
 RAW_NARRATIVE = {
+    'note_stress_index': lambda v: f"Officer-notes stress index (NLP): {v:.2f}/1.0 — {'alarming language' if v > 0.66 else 'some concern' if v > 0.4 else 'notes read healthy'}.",
     'person_age': lambda v: f"Borrower age: {int(v)} years.",
     'person_income': lambda v: f"Annual income: ${v:,.0f} — {'low' if v < 40000 else 'moderate' if v < 90000 else 'high'}.",
     'person_emp_length': lambda v: f"Employment length: {v:.0f} year(s) — {'short tenure' if v < 2 else 'stable'}.",
@@ -129,6 +168,9 @@ def _make_borrower(company_id: str, rng: np.random.RandomState) -> dict:
     default_flag = int(rng.random() < (0.10 + 0.05 * grade_ord))
     home = str(rng.choice(HOME, p=[.50, .12, .36, .02]))
     intent = str(rng.choice(INTENTS))
+    # risk proxy → officer note (unstructured); note_stress_index batch-scored by caller
+    risk_proxy = float(np.clip(0.30 * (grade_ord / 7) + 0.30 * min(pct_income / 0.5, 1)
+                               + 0.25 * ((int_rate - 7) / 15) + 0.15 * default_flag, 0, 1))
     return {
         'company_id': company_id,
         'person_age': age, 'person_income': round(income, 0),
@@ -136,6 +178,7 @@ def _make_borrower(company_id: str, rng: np.random.RandomState) -> dict:
         'loan_int_rate': round(int_rate, 2), 'loan_percent_income': round(pct_income, 3),
         'cb_person_cred_hist_length': cred_hist, 'loan_grade_ord': grade_ord,
         'default_flag': default_flag, 'person_home_ownership': home, 'loan_intent': intent,
+        'officer_notes': _pick_note(rng, risk_proxy),
         # display slots reused by the dashboard
         'sector': intent.title(), 'loan_type': f"Grade {GRADE_LETTER[grade_ord]}",
         'outstanding_loan': round(loan_amnt * 100, 0),   # scaled to ₹ for display
@@ -145,7 +188,9 @@ def _make_borrower(company_id: str, rng: np.random.RandomState) -> dict:
 
 def build_portfolio() -> pd.DataFrame:
     rng = np.random.RandomState(2024)
-    return pd.DataFrame([_make_borrower(f"BR-{i+1:04d}", rng) for i in range(200)])
+    df = pd.DataFrame([_make_borrower(f"BR-{i+1:04d}", rng) for i in range(200)])
+    df['note_stress_index'] = nlp_features.stress_index(df['officer_notes'])
+    return df
 
 
 _seq = 0
@@ -156,7 +201,9 @@ def generate_new_loans(count: int) -> pd.DataFrame:
     for _ in range(count):
         _seq += 1
         rows.append(_make_borrower(f"BR-N{_seq:04d}", rng))
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    df['note_stress_index'] = nlp_features.stress_index(df['officer_notes'])
+    return df
 
 
 def _intent_to_display(df: pd.DataFrame) -> pd.DataFrame:
@@ -246,7 +293,8 @@ def borrowers(limit: int = 50):
     df['pd'] = predict_portfolio(feature_df)
     top = df.sort_values('pd', ascending=False).head(limit)
     return [{"company_id": r['company_id'], "sector": r['sector'], "loan_type": r['loan_type'],
-             "pd": float(r['pd']), "outstanding_loan": float(r['outstanding_loan']),
+             "pd": float(r['pd']), "risk_score": int(round(float(r['pd']) * 100)),
+             "outstanding_loan": float(r['outstanding_loan']),
              "risk_band": get_risk_band(float(r['pd']))} for _, r in top.iterrows()]
 
 
@@ -277,14 +325,24 @@ def borrower_details(company_id: str):
     lgd = LGD_MAP.get(intent, 0.45)
     ead = float(row['outstanding_loan'])
     el = current_pd * ead * lgd
+    note = str(row.get('officer_notes', '') or '')
+    nsi = float(row['note_stress_index']) if 'note_stress_index' in row else None
+    # Blueprint risk-factor breakdown (grouped)
+    risk_factors = {}
+    for group, cols in RISK_FACTOR_GROUPS.items():
+        risk_factors[group] = [{"feature": c, "value": float(row[c]),
+                                "narrative": RAW_NARRATIVE.get(c, lambda v: f"{c}: {v:.2f}")(float(row[c]))}
+                               for c in cols if c in row]
     return {
         "company_id": company_id, "sector": row['sector'], "loan_type": row['loan_type'],
         "outstanding_loan": ead, "lgd_pct": lgd, "expected_loss": el,
         "potential_recovery": ead - el, "current_pd": current_pd,
+        "risk_score": int(round(current_pd * 100)),
         "risk_band": get_risk_band(current_pd), "timeline": timeline,
         "risk_migration": {"start_band": get_risk_band(timeline[0]['pd']),
                            "end_band": get_risk_band(current_pd)},
-        "journey_events": [], "officer_notes": "", "note_stress_index": None,
+        "journey_events": [], "officer_notes": note, "note_stress_index": nsi,
+        "risk_factors": risk_factors,
         "raw_features": {k: float(row[k]) for k in RAW_NUM},
         "action_ladder": ACTION_LADDER.get(get_risk_band(current_pd), [])}
 
@@ -329,6 +387,12 @@ async def upload_portfolio(file: UploadFile = File(...)):
         df['loan_grade_ord'] = df['loan_grade'].map(GRADE_MAP)
     if 'cb_person_default_on_file' in df.columns and 'default_flag' not in df.columns:
         df['default_flag'] = (df['cb_person_default_on_file'] == 'Y').astype(int)
+    # Unstructured: score officer notes → note_stress_index (neutral 0.5 if no notes column)
+    if 'note_stress_index' not in df.columns:
+        if 'officer_notes' in df.columns:
+            df['note_stress_index'] = nlp_features.stress_index(df['officer_notes'])
+        else:
+            df['note_stress_index'] = 0.5
     missing = [c for c in RAW_INPUT if c not in df.columns]
     if missing:
         raise HTTPException(422, f"CSV missing required columns: {missing}")
@@ -389,6 +453,8 @@ def _borrower_context(company_id: str) -> dict:
     lgd = LGD_MAP.get(r['loan_intent'], 0.45); ead = float(r['outstanding_loan'])
     return {"company_id": company_id, "sector": r['sector'], "pd": pd_val, "band": band,
             "ead": ead, "lgd": lgd, "expected_loss": pd_val * ead * lgd, "drivers": drivers,
+            "officer_notes": str(r.get('officer_notes', '') or ''),
+            "note_stress_index": float(r['note_stress_index']) if 'note_stress_index' in r else None,
             "actions": [a["action"] for a in ACTION_LADDER.get(band, [])]}
 
 

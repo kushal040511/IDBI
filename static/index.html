@@ -47,7 +47,7 @@
         <header class="bg-blue-900 text-white px-8 py-4 flex justify-between items-center shadow-xl">
             <div>
                 <h1 class="text-2xl font-extrabold tracking-tight">IDBI Credit Risk Intelligence</h1>
-                <p class="text-blue-300 text-sm mt-0.5">XGBoost + SHAP — Trained on 32.5k real borrowers · AUC 0.95</p>
+                <p class="text-blue-300 text-sm mt-0.5">XGBoost + SHAP + NLP — 32.5k real borrowers · structured + unstructured · AUC 0.97</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="text-right">
@@ -140,6 +140,7 @@
                                 </div>
                                 <p id="det-sector" class="text-slate-400 uppercase text-sm font-semibold tracking-wide">—</p>
                                 <div class="flex items-center gap-3 mt-3">
+                                    <span class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold">Risk Score: <span id="det-risk-score">—</span>/100</span>
                                     <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold">LGD: <span id="det-lgd">—</span>%</span>
                                     <span class="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold flex items-center gap-1">
                                         Risk Journey: <span id="det-mig-start">—</span> 
@@ -201,6 +202,12 @@
                             </div>
                             <span id="det-note-val" class="text-xs font-bold text-purple-700 w-10 text-right">—</span>
                         </div>
+                    </div>
+
+                    <!-- Row 2c: Risk-Factor Breakdown (blueprint categories) -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">🧮 Risk-Factor Breakdown</h3>
+                        <div id="risk-factors" class="grid grid-cols-2 gap-4"></div>
                     </div>
 
                     <!-- Row 3: Behavioral Copilot + Action Ladder -->
@@ -447,6 +454,20 @@
             document.getElementById('det-company').innerText = det.company_id;
             document.getElementById('det-sector').innerText = `${det.sector} • ${det.loan_type || 'Term Loan'}`;
             document.getElementById('det-lgd').innerText = (det.lgd_pct * 100).toFixed(0);
+            const rsEl = document.getElementById('det-risk-score');
+            if (rsEl) rsEl.innerText = det.risk_score != null ? det.risk_score : '—';
+
+            // Risk-factor breakdown (blueprint categories)
+            const rfEl = document.getElementById('risk-factors');
+            if (rfEl) {
+                rfEl.innerHTML = '';
+                Object.entries(det.risk_factors || {}).forEach(([group, items]) => {
+                    const lis = items.map(it => `<li class="text-xs text-slate-600 leading-snug">• ${it.narrative}</li>`).join('');
+                    rfEl.innerHTML += `<div class="bg-slate-50 border border-slate-100 rounded-lg p-3">
+                        <p class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">${group}</p>
+                        <ul class="space-y-1">${lis}</ul></div>`;
+                });
+            }
             document.getElementById('det-pd').innerText = (det.current_pd * 100).toFixed(1) + '%';
             document.getElementById('det-ead').innerText = formatInr(det.outstanding_loan);
             document.getElementById('det-el').innerText = formatInr(det.expected_loss);

@@ -1,84 +1,98 @@
 {
-  "dataset": "credit_risk_dataset.csv (real, 32.5k borrowers)",
+  "dataset": "credit_risk_dataset.csv (real) + synthetic risk-correlated officer notes",
   "n_train": 25927,
   "n_test": 6482,
   "default_rate": 0.2187,
   "tuning": {
     "method": "Optuna TPE",
-    "trials": 50,
+    "trials": 40,
     "cv_folds": 5,
-    "best_cv_auc": 0.9492,
+    "best_cv_auc": 0.9679,
     "best_params": {
-      "n_estimators": 750,
+      "n_estimators": 550,
       "max_depth": 6,
-      "learning_rate": 0.08133053799289963,
-      "subsample": 0.9390534793169014,
-      "colsample_bytree": 0.6372240831148525,
-      "min_child_weight": 11,
-      "gamma": 0.8286658430424825,
-      "reg_lambda": 0.003031399832219831,
-      "reg_alpha": 0.007999461080792983,
-      "scale_pos_weight": 2.6267963305515862
+      "learning_rate": 0.05731289046042222,
+      "subsample": 0.878472308686923,
+      "colsample_bytree": 0.8475943558719464,
+      "min_child_weight": 10,
+      "gamma": 3.2024705898812273,
+      "reg_lambda": 0.06850051360176702,
+      "reg_alpha": 0.020623852877929182,
+      "scale_pos_weight": 4.122119210028833
     }
   },
   "tuned": {
-    "roc_auc": 0.9542,
-    "pr_auc": 0.9135,
-    "log_loss": 0.1955,
-    "log_loss_calibrated": 0.1904,
-    "brier": 0.0563,
-    "brier_calibrated": 0.0503,
+    "roc_auc": 0.9692,
+    "pr_auc": 0.9369,
+    "log_loss": 0.2,
+    "log_loss_calibrated": 0.1582,
+    "brier": 0.0594,
+    "brier_calibrated": 0.0444,
     "at_0.50": {
       "threshold": 0.5,
-      "accuracy": 0.9284,
-      "precision": 0.8636,
-      "recall": 0.799,
-      "f1": 0.83,
+      "accuracy": 0.9168,
+      "precision": 0.7691,
+      "recall": 0.8858,
+      "f1": 0.8233,
       "confusion_matrix": {
-        "tn": 4885,
-        "fp": 179,
-        "fn": 285,
-        "tp": 1133
+        "tn": 4687,
+        "fp": 377,
+        "fn": 162,
+        "tp": 1256
       }
     },
     "at_best_f1": {
-      "threshold": 0.63,
-      "accuracy": 0.9375,
-      "precision": 0.9378,
-      "recall": 0.7652,
-      "f1": 0.8427,
+      "threshold": 0.73,
+      "accuracy": 0.9412,
+      "precision": 0.9086,
+      "recall": 0.8131,
+      "f1": 0.8582,
       "confusion_matrix": {
-        "tn": 4992,
-        "fp": 72,
-        "fn": 333,
-        "tp": 1085
+        "tn": 4948,
+        "fp": 116,
+        "fn": 265,
+        "tp": 1153
       }
     },
     "at_recall85": {
-      "threshold": 0.33,
-      "accuracy": 0.8952,
-      "precision": 0.7195,
-      "recall": 0.854,
-      "f1": 0.781,
+      "threshold": 0.63,
+      "accuracy": 0.9355,
+      "precision": 0.8536,
+      "recall": 0.8512,
+      "f1": 0.8524,
       "confusion_matrix": {
-        "tn": 4592,
-        "fp": 472,
-        "fn": 207,
-        "tp": 1211
+        "tn": 4857,
+        "fp": 207,
+        "fn": 211,
+        "tp": 1207
       }
     }
   },
-  "baseline_logreg": {
-    "roc_auc": 0.8647,
-    "accuracy": 0.7914,
-    "precision": 0.5153,
-    "recall": 0.7849,
-    "f1": 0.6221
+  "ablation_unstructured": {
+    "structured_only_auc": 0.9547,
+    "structured_plus_nlp_auc": 0.9692,
+    "auc_lift_from_unstructured": 0.0145
   },
   "operating_thresholds": {
-    "best_f1": 0.63,
-    "recall85": 0.33
+    "best_f1": 0.73,
+    "recall85": 0.63
   },
+  "features_structured": [
+    "person_age",
+    "person_income",
+    "person_emp_length",
+    "loan_amnt",
+    "loan_int_rate",
+    "loan_percent_income",
+    "cb_person_cred_hist_length",
+    "loan_grade_ord",
+    "default_flag",
+    "person_home_ownership",
+    "loan_intent"
+  ],
+  "features_unstructured": [
+    "note_stress_index"
+  ],
   "raw_features": [
     "person_age",
     "person_income",
@@ -89,6 +103,7 @@
     "cb_person_cred_hist_length",
     "loan_grade_ord",
     "default_flag",
+    "note_stress_index",
     "person_home_ownership",
     "loan_intent"
   ],
@@ -102,6 +117,7 @@
     "num__cb_person_cred_hist_length",
     "num__loan_grade_ord",
     "num__default_flag",
+    "num__note_stress_index",
     "cat__person_home_ownership_MORTGAGE",
     "cat__person_home_ownership_OTHER",
     "cat__person_home_ownership_OWN",
