@@ -1,0 +1,20 @@
+# virtual environments
+venv/
+.venv/
+env/
+
+# data (input datasets — not committed)
+data/
+
+# python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# secrets / env
+.env
+
+# os / misc
+.DS_Store
+*.output
+*.log

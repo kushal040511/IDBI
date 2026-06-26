@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Byte-compile all Python sources
+        run: python -m compileall -q main.py *.py
+
+      - name: Validate requirements.txt is parseable
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          for line in pathlib.Path("requirements.txt").read_text().splitlines():
+              line = line.split("#", 1)[0].strip()
+              if line:
+                  assert re.match(r"^[A-Za-z0-9_.\-\[\]]+", line), f"bad requirement: {line!r}"
+          print("requirements.txt OK")
+          PY
+
+      - name: Check model artifacts are present
+        run: |
+          for f in models/real/pipeline.joblib models/real/shap_explainer.joblib \
+                   models/real/feature_names.json models/real/performance_report.json; do
+            test -f "$f" && echo "  ✓ $f" || { echo "  ✗ missing $f"; exit 1; }
+          done
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenMP runtime (for XGBoost)
+        run: sudo apt-get update && sudo apt-get install -y libgomp1
+
+      - name: Install pinned runtime deps
+        run: pip install -r requirements-runtime.txt
+
+      - name: Boot the app and hit endpoints
+        run: |
+          uvicorn main:app --port 8000 &
+          for i in $(seq 1 40); do curl -sf http://127.0.0.1:8000/portfolio >/dev/null && break; sleep 2; done
+          echo "--- /portfolio ---"
+          curl -sf http://127.0.0.1:8000/portfolio | python -c "import sys,json;d=json.load(sys.stdin);assert d['total_borrowers']==200, d;print('  borrowers:',d['total_borrowers'],'avg_pd:',round(d['avg_pd'],3))"
+          echo "--- /borrowers ---"
+          curl -sf 'http://127.0.0.1:8000/borrowers?limit=3' | python -c "import sys,json;b=json.load(sys.stdin);assert len(b)==3, b;print('  top:',b[0]['company_id'],b[0]['risk_band'])"
+          echo "--- /model-performance ---"
+          curl -sf http://127.0.0.1:8000/model-performance | python -c "import sys,json;d=json.load(sys.stdin);assert d['tuned']['roc_auc']>0.9, d;print('  AUC:',d['tuned']['roc_auc'])"
+          echo "--- /borrowers/{id}/explain (SHAP) ---"
+          CID=$(curl -sf 'http://127.0.0.1:8000/borrowers?limit=1' | python -c "import sys,json;print(json.load(sys.stdin)[0]['company_id'])")
+          curl -sf "http://127.0.0.1:8000/borrowers/$CID/explain" | python -c "import sys,json;d=json.load(sys.stdin);assert d['key_drivers'];print('  drivers:',len(d['key_drivers']))"
+          echo "Smoke test passed ✓"

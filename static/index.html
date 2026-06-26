@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDBI MSME Risk Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 24px;
+            bottom: 0;
+            width: 2px;
+            background: #e5e7eb;
+        }
+        .band-Low { background: #dcfce7; color: #166534; }
+        .band-Medium { background: #fef9c3; color: #713f12; }
+        .band-High { background: #ffedd5; color: #9a3412; }
+        .band-Critical { background: #fee2e2; color: #991b1b; }
+        .action-routine { border-left: 4px solid #86efac; }
+        .action-medium { border-left: 4px solid #fde68a; }
+        .action-high { border-left: 4px solid #fb923c; }
+        .action-critical { border-left: 4px solid #f87171; }
+        .copilot-chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px;
+            background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #dbeafe; }
+        .copilot-chip:hover { background: rgba(250,204,21,0.25); border-color: #facc15; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-100 text-gray-800 min-h-screen">
+
+    <!-- Loading -->
+    <div id="loading" class="flex h-screen items-center justify-center flex-col gap-4">
+        <div class="w-16 h-16 border-4 border-blue-900 border-t-orange-500 rounded-full animate-spin"></div>
+        <p class="text-xl font-bold text-blue-900">Loading MSME Risk Engine...</p>
+    </div>
+
+    <div id="app" class="hidden">
+        <!-- Header -->
+        <header class="bg-blue-900 text-white px-8 py-4 flex justify-between items-center shadow-xl">
+            <div>
+                <h1 class="text-2xl font-extrabold tracking-tight">IDBI Credit Risk Intelligence</h1>
+                <p class="text-blue-300 text-sm mt-0.5">XGBoost + SHAP + NLP — 32.5k real borrowers · structured + unstructured · AUC 0.97</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <p class="text-blue-300 text-xs">Portfolio Status</p>
+                    <p id="hdr-risk" class="text-orange-400 font-bold text-lg">—</p>
+                </div>
+                <input type="file" id="upload-input" accept=".csv" class="hidden" onchange="uploadPortfolio(this)">
+                <button id="refresh-btn" onclick="refreshPortfolio()" title="Onboard new companies taking loans"
+                        class="bg-green-600 hover:bg-green-500 border border-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow flex items-center gap-2">
+                    <svg id="refresh-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    New Loans
+                </button>
+                <button onclick="document.getElementById('upload-input').click()"
+                        class="bg-white/10 hover:bg-white/20 border border-white/30 text-white px-4 py-2 rounded-lg font-bold text-sm shadow flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Upload CSV
+                </button>
+                <button onclick="resetPortfolio()" title="Restore demo portfolio"
+                        class="bg-white/10 hover:bg-white/20 border border-white/30 text-white px-3 py-2 rounded-lg font-bold text-sm shadow">↺</button>
+                <span class="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow">Enterprise Mode</span>
+            </div>
+        </header>
+
+        <div class="flex h-[calc(100vh-72px)] overflow-hidden">
+            
+            <!-- LEFT SIDEBAR -->
+            <div class="w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden shadow-lg">
+                
+                <!-- Portfolio Summary -->
+                <div class="p-5 border-b border-slate-200 bg-slate-50">
+                    <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Portfolio Overview</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white rounded-lg p-3 border border-slate-200">
+                            <p class="text-xs text-slate-500">Borrowers</p>
+                            <p id="total-borrowers" class="text-2xl font-extrabold text-blue-900">—</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 border border-slate-200">
+                            <p class="text-xs text-slate-500">Avg PD</p>
+                            <p id="avg-risk" class="text-2xl font-extrabold text-orange-500">—</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 border border-slate-200">
+                            <p class="text-xs text-slate-500">Total Exposure</p>
+                            <p id="total-exposure" class="text-lg font-bold text-slate-700">—</p>
+                        </div>
+                        <div class="bg-red-50 rounded-lg p-3 border border-red-200">
+                            <p class="text-xs text-red-600 font-semibold">Expected Loss</p>
+                            <p id="total-expected-loss" class="text-lg font-bold text-red-600">—</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Risk Band Pills -->
+                    <div class="mt-3 flex gap-2 flex-wrap" id="band-pills"></div>
+                </div>
+                
+                <!-- Sector Heatmap -->
+                <div class="p-5 border-b border-slate-200">
+                    <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Sector Risk Heatmap</h2>
+                    <div id="sector-table" class="space-y-2"></div>
+                </div>
+
+                <!-- Alert Queue -->
+                <div class="flex-1 overflow-hidden flex flex-col p-5">
+                    <h2 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">⚠ High Risk Alert Queue</h2>
+                    <ul id="borrower-list" class="space-y-2 overflow-y-auto flex-1"></ul>
+                </div>
+            </div>
+
+            <!-- MAIN CONTENT -->
+            <div class="flex-1 overflow-y-auto p-6">
+                
+                <!-- Empty State -->
+                <div id="empty-state" class="h-full flex flex-col items-center justify-center text-slate-400">
+                    <svg class="w-24 h-24 mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <p class="text-xl font-semibold">Select a borrower from the alert queue</p>
+                    <p class="text-sm mt-1">View the complete borrower journey, financial impact, and recommended interventions.</p>
+                </div>
+
+                <!-- Details Panel -->
+                <div id="details-state" class="hidden space-y-6">
+
+                    <!-- Row 1: Company Header -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center gap-3 mb-1">
+                                    <h2 id="det-company" class="text-3xl font-extrabold text-slate-800">—</h2>
+                                    <span id="det-band-badge" class="text-sm font-bold px-3 py-1 rounded-full">—</span>
+                                </div>
+                                <p id="det-sector" class="text-slate-400 uppercase text-sm font-semibold tracking-wide">—</p>
+                                <div class="flex items-center gap-3 mt-3">
+                                    <span class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold">Risk Score: <span id="det-risk-score">—</span>/100</span>
+                                    <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold">LGD: <span id="det-lgd">—</span>%</span>
+                                    <span class="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                                        Risk Journey: <span id="det-mig-start">—</span> 
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                        <span id="det-mig-end" class="font-bold text-red-600">—</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 text-right">
+                                <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                    <p class="text-xs text-slate-500 uppercase font-bold">Outstanding (EAD)</p>
+                                    <p id="det-ead" class="text-xl font-bold text-slate-800 mt-1">—</p>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                    <p class="text-xs text-slate-500 uppercase font-bold">Prob. of Default</p>
+                                    <p id="det-pd" class="text-2xl font-extrabold mt-1 text-red-600">—</p>
+                                </div>
+                                <div class="bg-red-50 rounded-xl p-4 border border-red-200">
+                                    <p class="text-xs text-red-600 uppercase font-bold">Expected Loss</p>
+                                    <p id="det-el" class="text-xl font-bold text-red-600 mt-1">—</p>
+                                </div>
+                                <div class="bg-green-50 rounded-xl p-4 border border-green-200">
+                                    <p class="text-xs text-green-600 uppercase font-bold">Potential Recovery</p>
+                                    <p id="det-recovery" class="text-xl font-bold text-green-600 mt-1">—</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Timeline Chart + Journey Ledger -->
+                    <div class="grid grid-cols-2 gap-6">
+                        
+                        <!-- Risk Timeline Chart -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">📈 Model-Derived Risk Timeline</h3>
+                            <canvas id="timelineChart" height="200"></canvas>
+                        </div>
+                        
+                        <!-- Borrower Journey Ledger -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-h-80 overflow-y-auto">
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">📋 Borrower Journey Ledger</h3>
+                            <div id="journey-ledger" class="relative space-y-4 timeline-line pl-10"></div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2b: Unstructured Signal (Officer Notes / NLP) -->
+                    <div id="unstructured-panel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                🗒 Unstructured Signal — Officer Notes (NLP)
+                            </h3>
+                            <span class="text-xs font-bold px-2 py-1 rounded-full bg-purple-100 text-purple-700">sentence-transformer</span>
+                        </div>
+                        <p id="det-note" class="text-sm text-slate-700 italic bg-slate-50 border border-slate-100 rounded-lg p-3">—</p>
+                        <div class="flex items-center gap-3 mt-3">
+                            <span class="text-xs text-slate-500 w-32 shrink-0">Note stress index</span>
+                            <div class="flex-1 bg-slate-100 rounded-full h-2.5">
+                                <div id="det-note-bar" class="h-2.5 rounded-full bg-purple-500" style="width:0%"></div>
+                            </div>
+                            <span id="det-note-val" class="text-xs font-bold text-purple-700 w-10 text-right">—</span>
+                        </div>
+                    </div>
+
+                    <!-- Row 2c: Risk-Factor Breakdown (blueprint categories) -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">🧮 Risk-Factor Breakdown</h3>
+                        <div id="risk-factors" class="grid grid-cols-2 gap-4"></div>
+                    </div>
+
+                    <!-- Row 3: Behavioral Copilot + Action Ladder -->
+                    <div class="grid grid-cols-2 gap-6">
+                        
+                        <!-- Behavioral Narrative Copilot -->
+                        <div class="bg-gradient-to-br from-blue-900 to-blue-950 rounded-2xl shadow-lg p-6 text-white">
+                            <h3 class="text-sm font-bold text-blue-300 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                Agentic Risk Copilot
+                            </h3>
+                            <div class="bg-white/10 rounded-xl border border-white/20 p-5 space-y-4 max-h-80 overflow-y-auto">
+                                <p class="text-blue-200 text-sm">Behavioural analysis of XGBoost SHAP signals...</p>
+                                <div>
+                                    <p class="text-white font-bold text-base">Risk Summary:</p>
+                                    <p id="copilot-summary" class="text-blue-100 text-sm mt-1 leading-relaxed">—</p>
+                                </div>
+                                <div>
+                                    <p class="text-yellow-400 font-bold text-xs uppercase mb-2">Primary Default Drivers:</p>
+                                    <ul id="copilot-drivers" class="space-y-2 text-sm text-blue-50"></ul>
+                                </div>
+                                <div class="pt-4 border-t border-white/20">
+                                    <p class="text-red-300 font-bold text-xs uppercase mb-1">Financial Exposure:</p>
+                                    <p id="copilot-financial" class="text-sm text-white">—</p>
+                                </div>
+
+                                <!-- Interactive Q&A -->
+                                <div class="pt-4 border-t border-white/20">
+                                    <p class="text-yellow-400 font-bold text-xs uppercase mb-2">Ask the Copilot:</p>
+                                    <div class="flex flex-wrap gap-2 mb-3">
+                                        <button onclick="askCopilot('Why is this borrower risky?')" class="copilot-chip">Why risky?</button>
+                                        <button onclick="askCopilot('What changed over the last six months?')" class="copilot-chip">What changed?</button>
+                                        <button onclick="askCopilot('What action should the bank take?')" class="copilot-chip">Recommended action</button>
+                                        <button onclick="askCopilot('Which borrowers require immediate attention?', true)" class="copilot-chip">Top portfolio risks</button>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <input id="copilot-input" type="text" placeholder="Type a question…"
+                                               onkeydown="if(event.key==='Enter')askCopilot()"
+                                               class="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-blue-300 focus:outline-none focus:border-yellow-400">
+                                        <button onclick="askCopilot()" class="bg-yellow-500 hover:bg-yellow-400 text-blue-950 font-bold px-4 py-2 rounded-lg text-sm">Ask</button>
+                                    </div>
+                                    <div id="copilot-answer" class="hidden mt-3 bg-black/20 rounded-lg p-3 text-sm text-blue-50 whitespace-pre-line leading-relaxed"></div>
+                                    <p id="copilot-engine" class="text-[10px] text-blue-400 mt-1"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Escalation Ladder -->
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">🎯 Recommended Intervention</h3>
+                            <div id="action-ladder" class="space-y-3 max-h-80 overflow-y-auto"></div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const formatInr = v => '₹' + (v / 100000).toFixed(2) + 'L';
+        let chartInstance = null;
+        let currentCompany = null;
+        const BAND_COLORS = { Low: 'bg-green-100 text-green-800', Medium: 'bg-yellow-100 text-yellow-800', High: 'bg-orange-100 text-orange-800', Critical: 'bg-red-100 text-red-800' };
+        const BAND_DOT = { Low: '#22c55e', Medium: '#eab308', High: '#f97316', Critical: '#ef4444' };
+        const ACTION_COLORS = { routine: 'action-routine bg-green-50', medium: 'action-medium bg-yellow-50', high: 'action-high bg-orange-50', critical: 'action-critical bg-red-50' };
+        const JOURNEY_STYLES = {
+            success: { dot: 'bg-green-500', icon: '✓', text: 'text-green-800', bg: 'bg-green-50' },
+            warning: { dot: 'bg-yellow-500', icon: '⚠', text: 'text-yellow-800', bg: 'bg-yellow-50' },
+            critical: { dot: 'bg-red-500', icon: '✗', text: 'text-red-800', bg: 'bg-red-50' }
+        };
+
+        async function initApp() {
+            try {
+                await loadPortfolio();
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
+            } catch(e) {
+                document.getElementById('loading').innerHTML = `<span class="text-red-600 font-bold text-xl">API Error: ${e.message}. Is FastAPI running?</span>`;
+                console.error(e);
+            }
+        }
+
+        async function loadPortfolio() {
+                const portData = await fetch('/portfolio').then(r => r.json());
+
+                document.getElementById('total-borrowers').innerText = portData.total_borrowers;
+                document.getElementById('avg-risk').innerText = (portData.avg_pd * 100).toFixed(1) + '%';
+                document.getElementById('total-exposure').innerText = formatInr(portData.total_exposure);
+                document.getElementById('total-expected-loss').innerText = formatInr(portData.total_expected_loss);
+                document.getElementById('hdr-risk').innerText = 'Avg Risk: ' + (portData.avg_pd * 100).toFixed(1) + '%';
+
+                // Risk Band Pills
+                const bandPills = document.getElementById('band-pills');
+                bandPills.innerHTML = '';
+                const dist = portData.risk_distribution;
+                ['Low', 'Medium', 'High', 'Critical'].forEach(b => {
+                    bandPills.innerHTML += `<span class="text-xs font-bold px-3 py-1 rounded-full ${BAND_COLORS[b]}">${b}: ${dist[b] || 0}</span>`;
+                });
+
+                // Sector Heatmap
+                const sectorEl = document.getElementById('sector-table');
+                sectorEl.innerHTML = '';
+                portData.sector_analytics.forEach(s => {
+                    const pct = (s.avg_pd * 100).toFixed(1);
+                    const barW = Math.min(100, s.avg_pd * 100 * 1.5);
+                    sectorEl.innerHTML += `
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-slate-600 w-28 shrink-0">${s.sector}</span>
+                            <div class="flex-1 bg-slate-100 rounded-full h-2">
+                                <div class="bg-orange-500 h-2 rounded-full" style="width:${barW}%"></div>
+                            </div>
+                            <span class="text-xs font-bold text-orange-600 w-10 text-right">${pct}%</span>
+                        </div>`;
+                });
+
+                // Borrower List
+                const borrData = await fetch('/borrowers').then(r => r.json());
+                const listEl = document.getElementById('borrower-list');
+                listEl.innerHTML = '';
+                borrData.forEach(b => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 rounded-xl cursor-pointer transition-all bg-slate-50 hover:bg-slate-100 border border-slate-200 flex justify-between items-center';
+                    li.innerHTML = `
+                        <div>
+                            <div class="font-bold text-slate-800 text-sm">${b.company_id}</div>
+                            <div class="text-xs text-slate-400 uppercase">${b.sector} • ${b.loan_type || 'Term Loan'}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-extrabold text-sm ${b.pd > 0.8 ? 'text-red-600' : b.pd > 0.5 ? 'text-orange-500' : 'text-yellow-600'}">${(b.pd * 100).toFixed(1)}%</div>
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-full ${BAND_COLORS[b.risk_band]}">${b.risk_band}</span>
+                        </div>`;
+                    li.onclick = () => loadDetails(b.company_id, li);
+                    listEl.appendChild(li);
+                });
+        }
+
+        // ─── Data Upload + Reset ───────────────────────────────
+        async function uploadPortfolio(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const hdr = document.getElementById('hdr-risk');
+            const prev = hdr.innerText;
+            hdr.innerText = 'Uploading…';
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/upload', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Upload failed');
+                // Reset detail view + refresh portfolio
+                document.getElementById('details-state').classList.add('hidden');
+                document.getElementById('empty-state').classList.remove('hidden');
+                currentCompany = null;
+                await loadPortfolio();
+                alert(`✓ Uploaded ${data.filename}\n${data.borrowers_scored} borrowers scored · avg PD ${(data.avg_pd*100).toFixed(1)}% · ${data.high_risk_count} high-risk`);
+            } catch (e) {
+                hdr.innerText = prev;
+                alert('Upload error: ' + e.message);
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function refreshPortfolio() {
+            const btn = document.getElementById('refresh-btn');
+            const icon = document.getElementById('refresh-icon');
+            btn.disabled = true; icon.classList.add('animate-spin');
+            try {
+                const res = await fetch('/refresh?count=10', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Refresh failed');
+                await loadPortfolio();
+                const top = data.new_loans.slice(0, 3)
+                    .map(l => `• ${l.company_id} (${l.sector}) — PD ${(l.pd*100).toFixed(1)}%, ${l.risk_band}`)
+                    .join('\n');
+                alert(`✓ ${data.added} new companies onboarded (now ${data.total_borrowers} borrowers)\n`
+                    + `${data.new_high_risk} flagged high-risk · avg PD ${(data.new_avg_pd*100).toFixed(1)}%\n\nRiskiest new loans:\n${top}`);
+            } catch (e) {
+                alert('Refresh error: ' + e.message);
+            } finally {
+                btn.disabled = false; icon.classList.remove('animate-spin');
+            }
+        }
+
+        async function resetPortfolio() {
+            await fetch('/reset', { method: 'POST' });
+            document.getElementById('details-state').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
+            currentCompany = null;
+            await loadPortfolio();
+        }
+
+        // ─── Interactive Copilot ───────────────────────────────
+        async function askCopilot(preset, portfolioLevel) {
+            const input = document.getElementById('copilot-input');
+            const question = preset || input.value.trim();
+            if (!question) return;
+            if (!portfolioLevel && !currentCompany) { alert('Select a borrower first, or use "Top portfolio risks".'); return; }
+            const ansEl = document.getElementById('copilot-answer');
+            const engEl = document.getElementById('copilot-engine');
+            ansEl.classList.remove('hidden');
+            ansEl.innerText = 'Thinking…';
+            engEl.innerText = '';
+            try {
+                const body = { question };
+                if (!portfolioLevel) body.company_id = currentCompany;
+                const res = await fetch('/copilot', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Copilot error');
+                ansEl.innerText = data.answer;
+                engEl.innerText = 'engine: ' + data.engine;
+            } catch (e) {
+                ansEl.innerText = 'Error: ' + e.message;
+            }
+            if (!preset) input.value = '';
+        }
+
+        async function loadDetails(company_id, elem) {
+            currentCompany = company_id;
+            const ansEl = document.getElementById('copilot-answer');
+            if (ansEl) { ansEl.classList.add('hidden'); ansEl.innerText = ''; }
+            const engEl = document.getElementById('copilot-engine');
+            if (engEl) engEl.innerText = '';
+            document.querySelectorAll('#borrower-list li').forEach(el => {
+                el.className = 'p-3 rounded-xl cursor-pointer transition-all bg-slate-50 hover:bg-slate-100 border border-slate-200 flex justify-between items-center';
+            });
+            elem.className = 'p-3 rounded-xl cursor-pointer transition-all bg-blue-900 text-white border border-blue-900 flex justify-between items-center shadow-lg';
+
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('details-state').classList.remove('hidden');
+
+            const cidEnc = encodeURIComponent(company_id);
+            const [det, shap] = await Promise.all([
+                fetch(`/borrowers/${cidEnc}`).then(r => r.json()),
+                fetch(`/borrowers/${cidEnc}/explain`).then(r => r.json())
+            ]);
+
+            // Header
+            document.getElementById('det-company').innerText = det.company_id;
+            document.getElementById('det-sector').innerText = `${det.sector} • ${det.loan_type || 'Term Loan'}`;
+            document.getElementById('det-lgd').innerText = (det.lgd_pct * 100).toFixed(0);
+            const rsEl = document.getElementById('det-risk-score');
+            if (rsEl) rsEl.innerText = det.risk_score != null ? det.risk_score : '—';
+
+            // Risk-factor breakdown (blueprint categories)
+            const rfEl = document.getElementById('risk-factors');
+            if (rfEl) {
+                rfEl.innerHTML = '';
+                Object.entries(det.risk_factors || {}).forEach(([group, items]) => {
+                    const lis = items.map(it => `<li class="text-xs text-slate-600 leading-snug">• ${it.narrative}</li>`).join('');
+                    rfEl.innerHTML += `<div class="bg-slate-50 border border-slate-100 rounded-lg p-3">
+                        <p class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">${group}</p>
+                        <ul class="space-y-1">${lis}</ul></div>`;
+                });
+            }
+            document.getElementById('det-pd').innerText = (det.current_pd * 100).toFixed(1) + '%';
+            document.getElementById('det-ead').innerText = formatInr(det.outstanding_loan);
+            document.getElementById('det-el').innerText = formatInr(det.expected_loss);
+            document.getElementById('det-recovery').innerText = formatInr(det.potential_recovery);
+
+            const badge = document.getElementById('det-band-badge');
+            badge.innerText = det.risk_band;
+            badge.className = `text-sm font-bold px-3 py-1 rounded-full ${BAND_COLORS[det.risk_band]}`;
+
+            // Unstructured signal (officer notes / NLP)
+            const noteEl = document.getElementById('det-note');
+            const noteBar = document.getElementById('det-note-bar');
+            const noteVal = document.getElementById('det-note-val');
+            const panel = document.getElementById('unstructured-panel');
+            if (panel) panel.style.display = (det.note_stress_index == null) ? 'none' : '';
+            noteEl.innerText = det.officer_notes ? `"${det.officer_notes}"` : 'No officer notes on file.';
+            if (det.note_stress_index != null) {
+                const ns = det.note_stress_index;
+                noteBar.style.width = (ns * 100).toFixed(0) + '%';
+                noteBar.className = 'h-2.5 rounded-full ' + (ns > 0.66 ? 'bg-red-500' : ns > 0.4 ? 'bg-orange-400' : 'bg-green-500');
+                noteVal.innerText = ns.toFixed(2);
+            } else {
+                noteBar.style.width = '0%'; noteVal.innerText = '—';
+            }
+
+            document.getElementById('det-mig-start').innerText = det.risk_migration.start_band;
+            document.getElementById('det-mig-end').innerText = det.risk_migration.end_band;
+            document.getElementById('det-mig-end').className = `font-bold ${det.risk_band === 'Critical' ? 'text-red-600' : 'text-orange-600'}`;
+
+            // Timeline Chart
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: det.timeline.map(t => t.month),
+                    datasets: [{
+                        label: 'PD %',
+                        data: det.timeline.map(t => (t.pd * 100).toFixed(1)),
+                        borderColor: '#e86a10',
+                        backgroundColor: (ctx) => {
+                            const grad = ctx.chart.ctx.createLinearGradient(0, 0, 0, 200);
+                            grad.addColorStop(0, 'rgba(232,106,16,0.3)');
+                            grad.addColorStop(1, 'rgba(232,106,16,0)');
+                            return grad;
+                        },
+                        borderWidth: 3,
+                        pointBackgroundColor: det.timeline.map(t => t.pd > 0.8 ? '#ef4444' : t.pd > 0.5 ? '#f97316' : '#22c55e'),
+                        pointRadius: 6,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: v => `PD: ${v.raw}%` } } },
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Borrower Journey Ledger
+            const journeyEl = document.getElementById('journey-ledger');
+            journeyEl.innerHTML = '';
+            if (det.journey_events && det.journey_events.length > 0) {
+                det.journey_events.slice(-16).forEach(ev => {
+                    const s = JOURNEY_STYLES[ev.type] || JOURNEY_STYLES.success;
+                    journeyEl.innerHTML += `
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full ${s.bg} ${s.text} flex items-center justify-center font-bold text-sm shrink-0 border-2 border-white shadow-sm z-10 relative">${s.icon}</div>
+                            <div class="${s.bg} rounded-lg px-3 py-2 flex-1 border border-slate-100">
+                                <p class="text-xs text-slate-400 font-medium">${ev.date}</p>
+                                <p class="text-sm font-semibold ${s.text}">${ev.desc}</p>
+                            </div>
+                        </div>`;
+                });
+            } else {
+                journeyEl.innerHTML = '<p class="text-slate-400 text-sm">No journey events available.</p>';
+            }
+
+            // Behavioral Narrative Copilot
+            const topDrivers = shap.key_drivers.slice(0, 4);
+            const riskBand = det.risk_band;
+
+            const summaryMap = {
+                Low: `This borrower shows stable financial signals with no immediate cause for concern.`,
+                Medium: `This borrower is showing early stress indicators. Proactive engagement is recommended.`,
+                High: `This borrower has significant stress signals across multiple dimensions. Immediate review is warranted.`,
+                Critical: `This borrower has migrated to Critical Risk status. Emergency intervention is required to protect the bank's exposure.`
+            };
+            document.getElementById('copilot-summary').innerText = summaryMap[riskBand];
+
+            const driversList = document.getElementById('copilot-drivers');
+            driversList.innerHTML = '';
+            topDrivers.forEach((d, i) => {
+                if(d.narrative) {
+                    driversList.innerHTML += `<li class="flex items-start gap-2"><span class="text-yellow-400 font-bold shrink-0">${i+1}.</span><span>${d.narrative}</span></li>`;
+                }
+            });
+
+            document.getElementById('copilot-financial').innerText =
+                `The bank's projected loss on this facility is ${formatInr(det.expected_loss)} (PD ${(det.current_pd*100).toFixed(1)}% × EAD ${formatInr(det.outstanding_loan)} × LGD ${(det.lgd_pct*100).toFixed(0)}%).`;
+
+            // Action Escalation Ladder
+            const ladderEl = document.getElementById('action-ladder');
+            ladderEl.innerHTML = '';
+            det.action_ladder.forEach(action => {
+                ladderEl.innerHTML += `
+                    <div class="${ACTION_COLORS[action.priority]} rounded-lg p-4">
+                        <p class="font-bold text-sm text-slate-800">${action.action}</p>
+                        <p class="text-xs text-slate-500 mt-1">${action.detail}</p>
+                    </div>`;
+            });
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
